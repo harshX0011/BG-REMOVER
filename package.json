@@ -5,7 +5,9 @@
   "description": "AI background remover (rembg isnet + u2net models on onnxruntime-node)",
   "main": "server.js",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "node -e \"import('./remove-bg.js').then((m) => m.downloadModels())\"",
     "start": "node server.js",
@@ -15,6 +17,6 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "onnxruntime-node": "^1.23.0",
-    "sharp": "^0.34.4"
+    "sharp": "^0.35.5"
   }
 }
