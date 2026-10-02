@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cutout — Background Remover</title>
+<meta name="description" content="Remove image backgrounds instantly. Upload a photo, get a transparent PNG.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5bf7'/><path d='M9 22l5-7 4 5 3-3 4 5z' fill='white'/></svg>">
+<style>
+  :root {
+    --bg: #f6f6f9; --surface: #fff; --text: #16161d; --muted: #6b6b7b; --border: #e3e3ea;
+    --accent: #5b5bf7; --accent-hover: #4949e6; --accent-soft: #ececfe; --danger: #d93a3a; --danger-soft: #fdecec;
+    --check-a: #fff; --check-b: #e9e9ef; --radius: 16px; --shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f14; --surface: #18181f; --text: #ececf1; --muted: #9a9aab; --border: #2a2a35;
+      --accent-soft: #23233a; --danger: #ff6b6b; --danger-soft: #3a1d1d;
+      --check-a: #26262f; --check-b: #1d1d25; --shadow: 0 8px 24px rgb(0 0 0 / .35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { text-align: center; margin-bottom: 32px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 0 0 8px; letter-spacing: -.02em; }
+  header p { color: var(--muted); margin: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+
+  .drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 300px; padding: 32px 16px;
+    border: 2px dashed var(--border); border-radius: 12px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop:hover, .drop:focus-visible, .drop.over { border-color: var(--accent); background: var(--accent-soft); outline: none; }
+  .drop svg { width: 48px; height: 48px; color: var(--accent); }
+  .drop strong { font-size: 18px; }
+  .drop small { color: var(--muted); }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; padding: 11px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; text-decoration: none; transition: background .15s, transform .05s; }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--accent-soft); }
+  .btn svg { width: 18px; height: 18px; }
+
+  .stage { position: relative; border-radius: 12px; overflow: hidden; user-select: none; touch-action: pan-y;
+    background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 20px 20px; }
+  .stage img { display: block; width: 100%; max-height: 70vh; object-fit: contain; pointer-events: none; }
+  .stage.done #before { clip-path: inset(0 calc(100% - var(--pos, 50%)) 0 0); }
+  .stage .after { position: absolute; inset: 0; height: 100%; clip-path: inset(0 0 0 var(--pos, 50%)); }
+  .stage .divider { position: absolute; top: 0; bottom: 0; left: var(--pos, 50%); width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / .15); pointer-events: none; }
+  .stage .divider::after { content: "⟷"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; border-radius: 50%;
+    background: #fff; color: #16161d; display: grid; place-items: center; font-size: 16px; box-shadow: 0 2px 8px rgb(0 0 0 / .25); }
+  .stage input[type=range] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+  .stage .tag { position: absolute; top: 12px; padding: 3px 10px; border-radius: 999px; background: rgb(0 0 0 / .55); color: #fff; font-size: 12px; font-weight: 600; pointer-events: none; }
+  .stage .tag.l { left: 12px; } .stage .tag.r { right: 12px; }
+
+  .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgb(15 15 20 / .55); color: #fff; backdrop-filter: blur(2px); }
+  .spinner { width: 44px; height: 44px; border: 4px solid rgb(255 255 255 / .3); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .bar { width: 200px; height: 6px; border-radius: 3px; background: rgb(255 255 255 / .25); overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: #fff; transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform .15s; }
+  .bar.indeterminate > i { width: 40%; transform: none; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-top: 16px; }
+  .actions .meta { color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .actions .group { display: flex; gap: 10px; flex-wrap: wrap; }
+  .error { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 15px; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 24px; color: var(--muted); font-size: 14px; text-align: center; }
+  [hidden] { display: none !important; }
+  @media (max-width: 560px) {
+    main { padding-top: 28px; }
+    .card { padding: 12px; }
+    .actions { flex-direction: column; align-items: stretch; }
+    .actions .group, .actions .btn { width: 100%; justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 0s !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Remove image backgrounds</h1>
+    <p>Upload a photo and get a transparent PNG in seconds.</p>
+  </header>
+
+  <div class="card">
+    <div id="error" class="error" role="alert" hidden></div>
+
+    <label id="drop" class="drop" tabindex="0" for="file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <strong>Drop an image here or click to upload</strong>
+      <small>JPEG, PNG or WebP · up to <span id="maxmb">10</span> MB · you can also paste</small>
+      <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+    </label>
+
+    <div id="result" hidden>
+      <div id="stage" class="stage">
+        <img id="before" alt="Original image">
+        <img id="after" class="after" alt="Image with background removed" hidden>
+        <div id="divider" class="divider" hidden></div>
+        <span class="tag l" id="tagL" hidden>Before</span><span class="tag r" id="tagR" hidden>After</span>
+        <input id="slider" type="range" min="0" max="100" value="50" aria-label="Before/after comparison" hidden>
+        <div id="overlay" class="overlay" aria-live="polite">
+          <div class="spinner"></div>
+          <div id="status">Uploading…</div>
+          <div id="bar" class="bar"><i></i></div>
+        </div>
+      </div>
+      <div class="actions">
+        <span id="meta" class="meta"></span>
+        <div class="group">
+          <button id="reset" class="btn btn-ghost" type="button">New image</button>
+          <a id="download" class="btn btn-primary" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+            Download PNG
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="features">
+    <div>⚡ Runs on a local AI model</div>
+    <div>🔒 Images are never stored</div>
+    <div>🖼️ Full-quality transparent PNG</div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TYPES = ["image/jpeg", "image/png", "image/webp"];
+let maxMb = 10, urls = [], xhr = null;
+
+fetch("/api/config").then(r => r.json()).then(c => { maxMb = c.maxMb; $("maxmb").textContent = maxMb; }).catch(() => {});
+
+function objectUrl(blob) { const u = URL.createObjectURL(blob); urls.push(u); return u; }
+function showError(msg) { $("error").textContent = msg; $("error").hidden = false; }
+
+function reset() {
+  if (xhr) xhr.abort();
+  urls.forEach(URL.revokeObjectURL); urls = [];
+  $("error").hidden = true; $("result").hidden = true; $("drop").hidden = false;
+  $("file").value = "";
+  ["after", "divider", "tagL", "tagR", "slider", "download"].forEach(id => $(id).hidden = true);
+  $("stage").classList.remove("done");
+  $("stage").style.setProperty("--pos", "50%"); $("slider").value = 50;
+}
+
+function setProgress(text, pct) {
+  $("status").textContent = text;
+  $("bar").classList.toggle("indeterminate", pct == null);
+  $("bar").style.setProperty("--p", pct == null ? 0 : pct / 100);
+}
+
+function handle(file) {
+  if (!file) return;
+  reset();
+  if (!TYPES.includes(file.type)) return showError("Please choose a JPEG, PNG or WebP image.");
+  if (file.size > maxMb * 1024 * 1024) return showError(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is ${maxMb} MB.`);
+
+  $("drop").hidden = true; $("result").hidden = false; $("overlay").hidden = false;
+  $("before").src = objectUrl(file);
+  $("meta").textContent = file.name;
+  setProgress("Uploading…", 0);
+
+  const form = new FormData();
+  form.append("file", file);
+  const started = performance.now();
+  xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/remove");
+  xhr.responseType = "blob";
+  xhr.upload.onprogress = (e) => e.lengthComputable && setProgress("Uploading…", Math.round(e.loaded / e.total * 100));
+  xhr.upload.onload = () => setProgress("Removing background…", null);
+  xhr.onload = async () => {
+    const req = xhr; xhr = null;
+    if (req.status !== 200) {
+      let msg = `Something went wrong (${req.status}). Please try again.`;
+      try { msg = JSON.parse(await req.response.text()).detail || msg; } catch {}
+      reset(); return showError(msg);
+    }
+    const url = objectUrl(req.response);
+    $("after").onload = () => {
+      $("overlay").hidden = true;
+      $("stage").classList.add("done");
+      ["after", "divider", "tagL", "tagR", "slider", "download"].forEach(id => $(id).hidden = false);
+      $("meta").textContent = `${file.name} · done in ${((performance.now() - started) / 1000).toFixed(1)}s`;
+    };
+    $("after").src = url;
+    $("download").href = url;
+    $("download").download = file.name.replace(/\.[^.]+$/, "") + "-no-bg.png";
+  };
+  xhr.onerror = () => { xhr = null; reset(); showError("Network error — check your connection and try again."); };
+  xhr.send(form);
+}
+
+$("file").addEventListener("change", (e) => handle(e.target.files[0]));
+$("reset").addEventListener("click", reset);
+$("slider").addEventListener("input", (e) => $("stage").style.setProperty("--pos", e.target.value + "%"));
+$("drop").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+
+const drop = $("drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => handle(e.dataTransfer.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => { e.preventDefault(); if (!$("drop").hidden) handle(e.dataTransfer.files[0]); });
+window.addEventListener("paste", (e) => { const f = [...e.clipboardData.files].find(f => f.type.startsWith("image/")); if (f) handle(f); });
+</script>
+</body>
+</html>

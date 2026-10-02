@@ -1,0 +1,7 @@
+node_modules/
+models/
+rembg-main/
+.venv/
+.claude/
+.impeccable/
+*.part

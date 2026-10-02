@@ -1,0 +1,19 @@
+{
+  "name": "cutout",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI background remover (rembg isnet + u2net models on onnxruntime-node)",
+  "main": "server.js",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "onnxruntime-node": "^1.23.0",
+    "sharp": "^0.34.4"
+  }
+}
