@@ -7,6 +7,7 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
+    "build": "node -e \"import('./remove-bg.js').then((m) => m.downloadModels())\"",
     "start": "node server.js",
     "test": "node test/smoke.mjs"
   },

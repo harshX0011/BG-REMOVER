@@ -32,6 +32,8 @@ async function ensureModel({ file, md5 }) {
   return dest;
 }
 
+export const downloadModels = () => Promise.all(Object.values(MODELS).map(ensureModel));
+
 export async function loadModels() {
   for (const [name, m] of Object.entries(MODELS)) {
     sessions[name] = await ort.InferenceSession.create(await ensureModel(m), {
